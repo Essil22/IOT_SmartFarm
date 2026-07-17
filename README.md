@@ -22,7 +22,7 @@ It displays:
 - Alert notifications
 - Relay actuator control
 
-![Smart Farm Dashboard](images/Dashboard.jpeg)
+![Smart Farm Dashboard](Images/Dashboard.jpeg)
 
 
 ## Hardware Setup
@@ -36,14 +36,14 @@ Components:
 - Soil moisture sensor
 - LDR light sensor
 - Relay module for actuator control
-![ESP8266 Wiring Diagram](images/esp8266_wiring_diagram.png)
-![Hardware Wiring](images/Wiring.jpeg)
+![ESP8266 Wiring Diagram](Images/esp8266_wiring_diagram.png)
+![Hardware Wiring](Images/Wiring.jpeg)
 
 ---
 
 # System Architecture
 
-![Monitoring Flow](images/smart_farm_monitoring_flow.png)
+![Monitoring Flow](Images/smart_farm_monitoring_flow.png)
 
 ---
 
@@ -92,7 +92,7 @@ When the dashboard loads, it retrieves the last 60 measurements using `/api/hist
 ---
 
 # Actuation Flow
-![Actuation Flow](images/smart_farm_actuation_flow.png)
+![Actuation Flow](Images/smart_farm_actuation_flow.png)
 
 The system supports remote actuator control through the dashboard.
 
