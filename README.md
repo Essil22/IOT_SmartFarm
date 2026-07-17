@@ -291,11 +291,4 @@ Possible extensions:
 - Machine learning based prediction
 - Automated irrigation control
 
----
 
-# Author
-
-**Essil Amaimi**
-
-Computer Engineering Student  
-IoT and Embedded Systems
