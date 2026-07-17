@@ -7,9 +7,9 @@
 // ── WIFI ──
 const char* ssid     = "iPhone";
 const char* password = "ee4411sousou";
-const char* mqtt_server = "172.20.10.3";  // your PC IP
+const char* mqtt_server = "172.20.10.3"; 
 
-// ── DHT (YOUR REAL WIRING) ──
+// ── DHT 
 #define DHTPIN D4
 #define DHTTYPE DHT11
 
@@ -18,7 +18,7 @@ const char* mqtt_server = "172.20.10.3";  // your PC IP
 int dryValue = 850;
 int wetValue = 350;
 
-// ── LIGHT (D0 DIGITAL LIKE YOUR OLD CODE) ──
+// ── LIGHT (D0 DIGITAL) ──
 #define LDR_PIN D0
 
 // ── RELAY (ACTUATOR - FR6) ──
