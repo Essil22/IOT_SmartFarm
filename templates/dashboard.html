@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Farm Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f1a0f;
+    --surface:   #152015;
+    --surface2:  #1c2b1c;
+    --border:    rgba(80,160,80,0.15);
+    --green:     #4caf6e;
+    --green-dim: #2a6b42;
+    --text:      #e8f0e8;
+    --text-muted:#7a9c7a;
+    --temp:      #ff7043;
+    --hum:       #42a5f5;
+    --moisture:  #66bb6a;
+    --light:     #ffd54f;
+    --warn:      #ff8f00;
+    --danger:    #e53935;
+    --radius:    12px;
+  }
+
+  body {
+    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    height: 60px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--green);
+  }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .nav-tab:hover { color: var(--text); background: var(--surface2); }
+  .nav-tab.active { color: var(--green); background: var(--surface2); }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--green);
+    background: rgba(76,175,110,0.1);
+    border: 1px solid rgba(76,175,110,0.2);
+    border-radius: 20px;
+    padding: 4px 12px;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .last-update { font-size: 11px; color: var(--text-muted); }
+
+  .page { display: none; padding: 1.5rem 2rem; }
+  .page.active { display: block; }
+
+  #alertBanner {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+  .alert-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .alert-warn   { background: rgba(255,143,0,0.12); border: 1px solid rgba(255,143,0,0.3); color: #ffb74d; }
+  .alert-danger { background: rgba(229,57,53,0.12);  border: 1px solid rgba(229,57,53,0.3);  color: #ef5350; }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .status-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .status-value { font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .status-healthy { color: var(--green); }
+  .status-warn    { color: var(--warn); }
+  .status-danger  { color: var(--danger); }
+  .status-meta { font-size: 12px; color: var(--text-muted); text-align: right; }
+
+  /* ── ACTUATOR CARD (new) ── */
+  .actuator-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .actuator-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .actuator-title { font-size: 15px; font-weight: 600; }
+  .actuator-buttons { display: flex; gap: 10px; }
+  .btn-on {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: none;
+    background: var(--green-dim);
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-on:hover { background: rgba(76,175,110,0.3); }
+  .btn-off {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid rgba(229,57,53,0.3);
+    background: rgba(229,57,53,0.1);
+    color: #ef5350;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-off:hover { background: rgba(229,57,53,0.25); }
+  .actuator-status { font-size: 12px; color: var(--text-muted); text-align: right; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 1.5rem;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem 1.4rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .kpi-temp::before     { background: var(--temp); }
+  .kpi-hum::before      { background: var(--hum); }
+  .kpi-moisture::before { background: var(--moisture); }
+  .kpi-light::before    { background: var(--light); }
+  .kpi-icon  { font-size: 20px; margin-bottom: 10px; }
+  .kpi-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .kpi-unit  { font-size: 14px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
+  .kpi-delta { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .kpi-alert { position: absolute; top: 14px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); display: none; }
+
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem 1.4rem;
+  }
+  .chart-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .chart-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chart-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .chart-range { display: flex; gap: 4px; }
+  .range-btn {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .range-btn.active,
+  .range-btn:hover {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: rgba(80,160,80,0.3);
+  }
+  .chart-wrap { position: relative; height: 180px; }
+
+  .history-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .history-controls label { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
+  .history-controls input[type="date"],
+  .history-controls select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  .btn-primary {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: none;
+    background: var(--green-dim);
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: rgba(76,175,110,0.25); }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 1.5rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    text-align: center;
+  }
+  .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+  .stat-val   { font-size: 22px; font-weight: 700; }
+  .stat-sub   { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  .history-chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.4rem;
+    margin-bottom: 14px;
+  }
+  .history-chart-title  { font-size: 13px; font-weight: 600; margin-bottom: 1rem; }
+  .history-chart-canvas { position: relative; height: 200px; }
+
+  @media (max-width: 900px) {
+    .kpi-grid   { grid-template-columns: repeat(2, 1fr); }
+    .chart-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    nav { padding: 0 1rem; }
+    .page { padding: 1rem; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  }
+  @media (max-width: 400px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">&#127807; SmartFarm</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('live', this)">&#9679; Live</button>
+    <button class="nav-tab" onclick="showPage('history', this)">&#128202; History</button>
+  </div>
+  <div class="nav-right">
+    <div class="live-badge"><div class="live-dot"></div> Live</div>
+    <div class="last-update" id="lastUpdate">—</div>
+  </div>
+</nav>
+
+<!-- LIVE PAGE -->
+<div id="page-live" class="page active">
+
+  <div id="alertBanner"></div>
+
+  <div class="status-row">
+    <div>
+      <div class="status-label">Farm Status</div>
+      <div class="status-value status-healthy" id="farmStatus">Connecting…</div>
+    </div>
+    <div class="status-meta" id="statusMeta">Fetching sensor data</div>
+  </div>
+
+  <!-- ACTUATOR CONTROL (new) -->
+  <div class="actuator-row">
+    <div>
+      <div class="actuator-label">Actuator Control</div>
+      <div class="actuator-title">Irrigation Relay</div>
+    </div>
+    <div class="actuator-buttons">
+      <button class="btn-on" onclick="toggleRelay('ON')">💧 Activate</button>
+      <button class="btn-off" onclick="toggleRelay('OFF')">⏹ Stop</button>
+    </div>
+    <div class="actuator-status" id="relayStatus">No command sent yet</div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card kpi-temp">
+      <div class="kpi-icon">&#127777;&#65039;</div>
+      <div class="kpi-label">Temperature</div>
+      <div class="kpi-value" id="kpi-temp">—<span class="kpi-unit">°C</span></div>
+      <div class="kpi-delta" id="delta-temp">Fetching…</div>
+      <div class="kpi-alert" id="alert-temp"></div>
+    </div>
+    <div class="kpi-card kpi-hum">
+      <div class="kpi-icon">&#128167;</div>
+      <div class="kpi-label">Humidity</div>
+      <div class="kpi-value" id="kpi-hum">—<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta" id="delta-hum">Fetching…</div>
+      <div class="kpi-alert" id="alert-hum"></div>
+    </div>
+    <div class="kpi-card kpi-moisture">
+      <div class="kpi-icon">&#127807;</div>
+      <div class="kpi-label">Soil Moisture</div>
+      <div class="kpi-value" id="kpi-moisture">—<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta" id="delta-moisture">Fetching…</div>
+      <div class="kpi-alert" id="alert-moisture"></div>
+    </div>
+    <div class="kpi-card kpi-light">
+      <div class="kpi-icon">&#9728;&#65039;</div>
+      <div class="kpi-label">Light</div>
+      <div class="kpi-value" id="kpi-light">—<span class="kpi-unit">lx</span></div>
+      <div class="kpi-delta" id="delta-light">Fetching…</div>
+      <div class="kpi-alert" id="alert-light"></div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title"><span class="chart-dot" style="background:var(--temp)"></span>Temperature</div>
+        <div class="chart-range">
+          <button class="range-btn active" onclick="setRange('temp',10,this)">10</button>
+          <button class="range-btn" onclick="setRange('temp',30,this)">30</button>
+          <button class="range-btn" onclick="setRange('temp',60,this)">60</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartTemp"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title"><span class="chart-dot" style="background:var(--hum)"></span>Humidity</div>
+        <div class="chart-range">
+          <button class="range-btn active" onclick="setRange('hum',10,this)">10</button>
+          <button class="range-btn" onclick="setRange('hum',30,this)">30</button>
+          <button class="range-btn" onclick="setRange('hum',60,this)">60</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartHum"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title"><span class="chart-dot" style="background:var(--moisture)"></span>Soil Moisture</div>
+        <div class="chart-range">
+          <button class="range-btn active" onclick="setRange('moisture',10,this)">10</button>
+          <button class="range-btn" onclick="setRange('moisture',30,this)">30</button>
+          <button class="range-btn" onclick="setRange('moisture',60,this)">60</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartMoisture"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title"><span class="chart-dot" style="background:var(--light)"></span>Light Intensity</div>
+        <div class="chart-range">
+          <button class="range-btn active" onclick="setRange('light',10,this)">10</button>
+          <button class="range-btn" onclick="setRange('light',30,this)">30</button>
+          <button class="range-btn" onclick="setRange('light',60,this)">60</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chartLight"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY PAGE -->
+<div id="page-history" class="page">
+  <div class="history-controls">
+    <div><label>From</label><input type="date" id="dateFrom"></div>
+    <div><label>To</label><input type="date" id="dateTo"></div>
+    <div>
+      <label>Sensor</label>
+      <select id="sensorSelect">
+        <option value="all">All Sensors</option>
+        <option value="temperature">Temperature</option>
+        <option value="humidity">Humidity</option>
+        <option value="moisture">Soil Moisture</option>
+        <option value="light">Light</option>
+      </select>
+    </div>
+    <button class="btn-primary" onclick="loadHistory()">Load</button>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Avg Temperature</div>
+      <div class="stat-val" id="stat-temp-avg">—</div>
+      <div class="stat-sub">°C</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Humidity</div>
+      <div class="stat-val" id="stat-hum-avg">—</div>
+      <div class="stat-sub">%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Moisture</div>
+      <div class="stat-val" id="stat-moist-avg">—</div>
+      <div class="stat-sub">%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Light</div>
+      <div class="stat-val" id="stat-light-avg">—</div>
+      <div class="stat-sub">lx</div>
+    </div>
+  </div>
+
+  <div class="history-chart-wrap">
+    <div class="history-chart-title">Temperature History</div>
+    <div class="history-chart-canvas"><canvas id="hChartTemp"></canvas></div>
+  </div>
+  <div class="history-chart-wrap">
+    <div class="history-chart-title">Humidity History</div>
+    <div class="history-chart-canvas"><canvas id="hChartHum"></canvas></div>
+  </div>
+  <div class="history-chart-wrap">
+    <div class="history-chart-title">Soil Moisture History</div>
+    <div class="history-chart-canvas"><canvas id="hChartMoisture"></canvas></div>
+  </div>
+  <div class="history-chart-wrap">
+    <div class="history-chart-title">Light Intensity History</div>
+    <div class="history-chart-canvas"><canvas id="hChartLight"></canvas></div>
+  </div>
+</div>
+
+<script>
+/* ── CONFIG ── */
+const API_LATEST  = '/api/latest';
+const API_HISTORY = '/api/history';
+const API_RELAY   = '/api/relay';
+const REFRESH_MS  = 5000;
+
+const THRESHOLDS = {
+  temperature: { warnHigh: 30, dangerHigh: 35, warnLow: 5,    dangerLow: 0   },
+  humidity:    { warnLow: 30,  dangerLow: 20,  warnHigh: 90,  dangerHigh: 95 },
+  moisture:    { warnLow: 25,  dangerLow: 15,  warnHigh: 85,  dangerHigh: 95 },
+  light:       { warnLow: 100, dangerLow: 50,  warnHigh: 1200, dangerHigh: 1500 }
+};
+
+/* ── ACTUATOR CONTROL (new) ── */
+function toggleRelay(command) {
+  const statusEl = document.getElementById('relayStatus');
+  statusEl.textContent = 'Sending...';
+  fetch(API_RELAY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command: command })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      statusEl.textContent = 'Error: ' + data.error;
+    } else {
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      statusEl.textContent = 'Relay ' + data.command + ' — sent at ' + time;
+    }
+  })
+  .catch(err => {
+    statusEl.textContent = 'Request failed';
+  });
+}
+
+/* ── CHART DEFAULTS ── */
+const CHART_OPT = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 400 },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1c2b1c',
+      borderColor: 'rgba(80,160,80,0.3)',
+      borderWidth: 1,
+      titleColor: '#e8f0e8',
+      bodyColor: '#7a9c7a',
+      padding: 10,
+      displayColors: false
+    }
+  },
+  scales: {
+    x: {
+      grid: { color: 'rgba(80,160,80,0.06)' },
+      ticks: { color: '#7a9c7a', font: { size: 10 }, maxTicksLimit: 8 },
+      border: { color: 'rgba(80,160,80,0.1)' }
+    },
+    y: {
+      grid: { color: 'rgba(80,160,80,0.06)' },
+      ticks: { color: '#7a9c7a', font: { size: 10 } },
+      border: { display: false }
+    }
+  }
+};
+
+function makeChart(id, color) {
+  return new Chart(document.getElementById(id), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        borderColor: color,
+        backgroundColor: color + '18',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: JSON.parse(JSON.stringify(CHART_OPT))
+  });
+}
+
+const charts = {
+  temp:     makeChart('chartTemp',     '#ff7043'),
+  hum:      makeChart('chartHum',      '#42a5f5'),
+  moisture: makeChart('chartMoisture', '#66bb6a'),
+  light:    makeChart('chartLight',    '#ffd54f')
+};
+
+const buffers = { temp: [], hum: [], moisture: [], light: [] };
+const ranges  = { temp: 10, hum: 10, moisture: 10, light: 10 };
+
+function setRange(key, n, btn) {
+  ranges[key] = n;
+  btn.closest('.chart-range').querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  redrawCharts();
+}
+
+function pushPoint(key, value, time) {
+  buffers[key].push({ x: time, y: value });
+  if (buffers[key].length > 120) buffers[key].shift();
+}
+
+function redrawCharts() {
+  ['temp','hum','moisture','light'].forEach(k => {
+    const pts = buffers[k].slice(-ranges[k]);
+    charts[k].data.labels = pts.map(p => p.x);
+    charts[k].data.datasets[0].data = pts.map(p => p.y);
+    charts[k].update('none');
+  });
+}
+
+/* ── LIVE FETCH ── */
+function checkLevel(val, t) {
+  if (val >= t.dangerHigh || val <= t.dangerLow) return 'danger';
+  if (val >= t.warnHigh   || val <= t.warnLow)  return 'warn';
+  return 'ok';
+}
+
+function updateKpi(id, val, unit, level) {
+  document.getElementById('kpi-' + id).innerHTML = val + '<span class="kpi-unit">' + unit + '</span>';
+  document.getElementById('alert-' + id).style.display = level !== 'ok' ? 'block' : 'none';
+}
+
+async function fetchLatest() {
+  try {
+    const res = await fetch(API_LATEST);
+    if (!res.ok) throw new Error('api error');
+    const d = await res.json();
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    pushPoint('temp',     d.temperature, now);
+    pushPoint('hum',      d.humidity,    now);
+    pushPoint('moisture', d.moisture,    now);
+    pushPoint('light',    d.light,       now);
+    redrawCharts();
+
+    const tL = checkLevel(d.temperature, THRESHOLDS.temperature);
+    const hL = checkLevel(d.humidity,    THRESHOLDS.humidity);
+    const mL = checkLevel(d.moisture,    THRESHOLDS.moisture);
+    const lL = checkLevel(d.light,       THRESHOLDS.light);
+
+    updateKpi('temp',     d.temperature.toFixed(1), '°C', tL);
+    updateKpi('hum',      d.humidity.toFixed(0),    '%',  hL);
+    updateKpi('moisture', d.moisture.toFixed(0),    '%',  mL);
+    updateKpi('light',    d.light.toFixed(0),       'lx', lL);
+
+    ['temp','hum','moisture','light'].forEach(k => {
+      const buf = buffers[k];
+      if (buf.length >= 2) {
+        const diff = (buf[buf.length-1].y - buf[buf.length-2].y).toFixed(1);
+        const el = document.getElementById('delta-' + k);
+        if (el) el.textContent = (diff >= 0 ? '+' : '') + diff + ' from last reading';
+      }
+    });
+
+    const alerts = [];
+    if (d.temperature > THRESHOLDS.temperature.dangerHigh) alerts.push({ cls: 'alert-danger', msg: '🌡️ High temperature — ' + d.temperature.toFixed(1) + '°C' });
+    if (d.temperature < THRESHOLDS.temperature.dangerLow)  alerts.push({ cls: 'alert-danger', msg: '🌡️ Low temperature — '  + d.temperature.toFixed(1) + '°C' });
+    if (d.humidity    < THRESHOLDS.humidity.warnLow)       alerts.push({ cls: 'alert-warn',   msg: '💧 Low humidity — '      + d.humidity.toFixed(0)    + '%'  });
+    if (d.moisture    < THRESHOLDS.moisture.warnLow)       alerts.push({ cls: 'alert-warn',   msg: '🌱 Irrigation needed — soil moisture ' + d.moisture.toFixed(0) + '%' });
+    if (d.light       > THRESHOLDS.light.warnHigh)         alerts.push({ cls: 'alert-warn',   msg: '☀️ High light — '        + d.light.toFixed(0)       + ' lx'});
+
+    const banner = document.getElementById('alertBanner');
+    banner.innerHTML = alerts.map(a => `<div class="alert-item ${a.cls}">${a.msg}</div>`).join('');
+    banner.style.display = alerts.length ? 'flex' : 'none';
+
+    const statusEl = document.getElementById('farmStatus');
+    const metaEl   = document.getElementById('statusMeta');
+    if ([tL,hL,mL,lL].includes('danger')) {
+      statusEl.textContent = 'Attention Required';
+      statusEl.className   = 'status-value status-danger';
+      metaEl.textContent   = 'One or more sensors exceed safe thresholds';
+    } else if ([tL,hL,mL,lL].includes('warn')) {
+      statusEl.textContent = 'Monitor Closely';
+      statusEl.className   = 'status-value status-warn';
+      metaEl.textContent   = 'Some sensors approaching threshold limits';
+    } else {
+      statusEl.textContent = 'Healthy';
+      statusEl.className   = 'status-value status-healthy';
+      metaEl.textContent   = 'All sensors within normal range';
+    }
+
+    document.getElementById('lastUpdate').textContent = 'Updated ' + now;
+
+  } catch (err) {
+    useDemoData();
+  }
+}
+
+function useDemoData() {
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const t = Date.now();
+  const d = {
+    temperature: 22 + Math.sin(t / 30000) * 4,
+    humidity:    60 + Math.sin(t / 25000) * 10,
+    moisture:    40 + Math.sin(t / 20000) * 8,
+    light:       700 + Math.sin(t / 15000) * 150
+  };
+  pushPoint('temp',     parseFloat(d.temperature.toFixed(1)), now);
+  pushPoint('hum',      parseFloat(d.humidity.toFixed(0)),    now);
+  pushPoint('moisture', parseFloat(d.moisture.toFixed(0)),    now);
+  pushPoint('light',    parseFloat(d.light.toFixed(0)),       now);
+  redrawCharts();
+  updateKpi('temp',     d.temperature.toFixed(1), '°C', 'ok');
+  updateKpi('hum',      d.humidity.toFixed(0),    '%',  'ok');
+  updateKpi('moisture', d.moisture.toFixed(0),    '%',  'ok');
+  updateKpi('light',    d.light.toFixed(0),       'lx', 'ok');
+  document.getElementById('farmStatus').textContent = 'Demo Mode';
+  document.getElementById('farmStatus').className   = 'status-value status-warn';
+  document.getElementById('statusMeta').textContent = 'Flask not reachable — showing simulated data';
+  document.getElementById('lastUpdate').textContent = 'Demo — ' + now;
+}
+
+/* ── HISTORY PAGE ── */
+let hCharts = {};
+
+function makeHistoryChart(id, color) {
+  return new Chart(document.getElementById(id), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        borderColor: color,
+        backgroundColor: color + '18',
+        borderWidth: 1.5,
+        pointRadius: 1,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: JSON.parse(JSON.stringify(CHART_OPT))
+  });
+}
+
+function initHistoryCharts() {
+  if (hCharts.temp) return;
+  hCharts.temp     = makeHistoryChart('hChartTemp',     '#ff7043');
+  hCharts.hum      = makeHistoryChart('hChartHum',      '#42a5f5');
+  hCharts.moisture = makeHistoryChart('hChartMoisture', '#66bb6a');
+  hCharts.light    = makeHistoryChart('hChartLight',    '#ffd54f');
+}
+
+async function loadHistory() {
+  initHistoryCharts();
+  const from   = document.getElementById('dateFrom').value;
+  const to     = document.getElementById('dateTo').value;
+  const sensor = document.getElementById('sensorSelect').value;
+
+  let url = API_HISTORY;
+  const params = [];
+  if (from) params.push('from=' + from);
+  if (to)   params.push('to='   + to);
+  if (sensor !== 'all') params.push('sensor=' + sensor);
+  if (params.length) url += '?' + params.join('&');
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('api error');
+    const rows = await res.json();
+    renderHistory(rows.length ? rows : generateDemoHistory());
+  } catch {
+    renderHistory(generateDemoHistory());
+  }
+}
+
+function generateDemoHistory() {
+  const rows = [];
+  const now = Date.now();
+  for (let i = 47; i >= 0; i--) {
+    const ts = new Date(now - i * 30 * 60000);
+    rows.push({
+      timestamp:   ts.toISOString(),
+      temperature: parseFloat((22 + Math.sin(i/8)*5  + Math.random()).toFixed(1)),
+      humidity:    parseFloat((60 + Math.sin(i/6)*12 + Math.random()*2).toFixed(1)),
+      moisture:    parseFloat((40 + Math.sin(i/5)*10 + Math.random()*2).toFixed(1)),
+      light:       parseFloat((700 + Math.sin(i/4)*200 + Math.random()*20).toFixed(0))
+    });
+  }
+  return rows;
+}
+
+function avg(arr) { return arr.length ? arr.reduce((a,b) => a+b, 0) / arr.length : 0; }
+
+function renderHistory(rows) {
+  if (!rows || !rows.length) return;
+  const labels  = rows.map(r => {
+    const d = new Date(r.timestamp);
+    return d.toLocaleDateString([], { month:'short', day:'numeric' }) + ' ' +
+           d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  });
+  const temps  = rows.map(r => r.temperature);
+  const hums   = rows.map(r => r.humidity);
+  const moists = rows.map(r => r.moisture);
+  const lights = rows.map(r => r.light);
+
+  [[hCharts.temp, temps],[hCharts.hum, hums],[hCharts.moisture, moists],[hCharts.light, lights]]
+    .forEach(([chart, vals]) => {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = vals;
+      chart.update();
+    });
+
+  document.getElementById('stat-temp-avg').textContent  = avg(temps).toFixed(1);
+  document.getElementById('stat-hum-avg').textContent   = avg(hums).toFixed(1);
+  document.getElementById('stat-moist-avg').textContent = avg(moists).toFixed(1);
+  document.getElementById('stat-light-avg').textContent = Math.round(avg(lights));
+}
+
+/* ── PAGE SWITCHING ── */
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'history') { initHistoryCharts(); loadHistory(); }
+}
+
+/* ── INIT ── */
+const today   = new Date();
+const weekAgo = new Date(today - 7 * 86400000);
+document.getElementById('dateTo').value   = today.toISOString().split('T')[0];
+document.getElementById('dateFrom').value = weekAgo.toISOString().split('T')[0];
+
+async function preloadCharts() {
+  try {
+    const res = await fetch('/api/history');
+    if (!res.ok) return;
+    const rows = await res.json();
+    if (!rows || rows.length === 0) return;
+
+    const recent = rows.slice(-60);
+    recent.forEach(r => {
+      const time = new Date(r.timestamp).toLocaleTimeString([], {
+        hour: '2-digit', minute: '2-digit'
+      });
+      if (r.temperature != null) pushPoint('temp',     r.temperature, time);
+      if (r.humidity    != null) pushPoint('hum',      r.humidity,    time);
+      if (r.moisture    != null) pushPoint('moisture', r.moisture,    time);
+      if (r.light       != null) pushPoint('light',    r.light,       time);
+    });
+
+    redrawCharts();
+  } catch(e) {
+    console.log('Preload skipped:', e);
+  }
+}
+
+preloadCharts().then(() => {
+  fetchLatest();
+  setInterval(fetchLatest, REFRESH_MS);
+});
+</script>
+</body>
+</html>
