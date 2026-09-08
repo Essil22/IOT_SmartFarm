@@ -9,7 +9,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'))
 
-DB_PATH = os.path.join(BASE_DIR, 'smartfarm.db')
+DB_PATH = os.path.join(BASE_DIR, '..', '..', 'smartfarm.db')
 MQTT_BROKER = 'localhost'
 
 
